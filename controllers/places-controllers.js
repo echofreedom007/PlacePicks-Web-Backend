@@ -3,6 +3,8 @@ const { validationResult } = require("express-validator");
 
 const HttpError = require("../models/http-errors");
 
+const getCoordsForAddress = require("../util/location");
+
 let DUMMY_PLACES = [
   {
     id: "p1",
@@ -78,17 +80,25 @@ const getPlacesByUserId = (req, res, next) => {
 };
 
 // GET request does not have a request body, while POST request does
-const createPlace = (req, res, next) => {
+const createPlace = async (req, res, next) => {
   // after we set up check apis in the places route, we should also return error object here, then
   // we can set up the full validations.
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
-    throw new HttpError("Invalid inputs passed, please check your data.", 422);
+    // console.log(errors);
+    return next(
+      new HttpError("Invalid inputs passed, please check your data.", 422)
+    );
   }
 
   // get the properties out of the request body
-  const { title, description, coordinates, address, creator } = req.body;
+  const { title, description, address, creator } = req.body;
+  let coordinates;
+  try {
+    coordinates = await getCoordsForAddress(address);
+  } catch (error) {
+    return next(error);
+  }
 
   const createdPlace = {
     id: uuid.v4(),
