@@ -1,4 +1,5 @@
 const uuid = require("uuid");
+const { validationResult } = require("express-validator");
 
 const HttpError = require("../models/http-errors");
 
@@ -78,6 +79,14 @@ const getPlacesByUserId = (req, res, next) => {
 
 // GET request does not have a request body, while POST request does
 const createPlace = (req, res, next) => {
+  // after we set up check apis in the places route, we should also return error object here, then
+  // we can set up the full validations.
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    console.log(errors);
+    throw new HttpError("Invalid inputs passed, please check your data.", 422);
+  }
+
   // get the properties out of the request body
   const { title, description, coordinates, address, creator } = req.body;
 
@@ -97,6 +106,12 @@ const createPlace = (req, res, next) => {
 const updatePlaceById = (req, res, next) => {
   const placeId = req.params.pid;
   const { title, description } = req.body;
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    console.log(errors);
+    throw new HttpError("Invalid inputs passed, please check your data.", 422);
+  }
 
   //update the properties in an immutable manner. Store the updated data in a variable, and only
   // when this process is done successfully, will we update the array with this variable.
@@ -124,8 +139,11 @@ const updatePlaceById = (req, res, next) => {
 const deletePlaceById = (req, res, next) => {
   const placeId = req.params.pid;
 
-  //filter() return a brand new array, adhering to the immutablility principle
+  if (!DUMMY_PLACES.find((p) => p.id === placeId)) {
+    throw new HttpError("COuld not find a place for that id.", 404);
+  }
 
+  //filter() return a brand new array, adhering to the immutablility principle
   DUMMY_PLACES = DUMMY_PLACES.filter((p) => p.id !== placeId);
 
   res.status(200).json({ mesage: "Deleted place.", place: DUMMY_PLACES });
