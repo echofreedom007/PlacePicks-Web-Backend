@@ -1,4 +1,3 @@
-const uuid = require("uuid");
 const { validationResult } = require("express-validator");
 
 const HttpError = require("../models/http-errors");
@@ -34,8 +33,8 @@ const getPlaceById = async (req, res, next) => {
   if (!place) {
     // we can choose either to use throw to throw the error here, or to use next to forward the error to
     // app.js, but the better option is to use next. The reason is that we might be using a asynchronous middleware.
-    //-------
     // throw can cancel the function execution, no need for return
+
     const error = new HttpError(
       "Could not find a place for the provided id.",
       404
@@ -84,7 +83,6 @@ const createPlace = async (req, res, next) => {
   // we can set up the full validations.
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // console.log(errors);
     return next(
       new HttpError("Invalid inputs passed, please check your data.", 422)
     );
