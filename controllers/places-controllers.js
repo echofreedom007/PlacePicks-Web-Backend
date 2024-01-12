@@ -212,7 +212,8 @@ const deletePlace = async (req, res, next) => {
   let place;
 
   try {
-    place = await Place.findById(placeId);
+    // populate method is to refer to the property in other collections
+    place = await Place.findById(placeId).populate("creator");
     // console.log(place);
   } catch (err) {
     // console.log(err);
@@ -223,9 +224,22 @@ const deletePlace = async (req, res, next) => {
     return next(error);
   }
 
+  if (!place) {
+    const error = new HttpError("Could not find place for this id.", 404);
+    return next(error);
+  }
+
   try {
+    const sess = await mongoose.startSession();
+    sess.startTransaction();
     // document.remove() is descrepted, now using deleteOne()
-    await place.deleteOne();
+    await place.deleteOne({ session: sess });
+
+    // pull method will automatically remove the id
+    place.creator.places.pull(place);
+    // save the newly created user
+    await place.creator.save({ session: sess });
+    await sess.commitTransaction();
   } catch (err) {
     // console.log(err);
     const error = new HttpError(
