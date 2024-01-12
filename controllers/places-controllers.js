@@ -5,69 +5,64 @@ const HttpError = require("../models/http-errors");
 
 const getCoordsForAddress = require("../util/location");
 
-let DUMMY_PLACES = [
-  {
-    id: "p1",
-    title: "Tofino, British Columbia",
-    description:
-      "A popular year-round tourism destination, Tofino's summer population swells to many times its winter size. It attracts surfers, hikers, nature lovers, bird watchers, campers, whale watchers, fishers, or anyone just looking to be close to nature.",
-    imageUrl:
-      "https://www.travelandleisure.com/thmb/30qfukQH1j5olGSTkZQqsM4phoI=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/TAL-tofino-BEAUTYCANADA0623-6d4980ad850c4b668185364daf4ce7fd.jpg",
-    address: "411 Campbell Street, Tofino",
-    location: {
-      lat: 49.1523597,
-      lng: -125.9068902,
-    },
-    creator: "u1",
-  },
-  {
-    id: "p2",
-    title: "To",
-    description: "A popular destination.",
-    imageUrl:
-      "https://www.travelandleisure.com/thmb/30qfukQH1j5olGSTkZQqsM4phoI=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/TAL-tofino-BEAUTYCANADA0623-6d4980ad850c4b668185364daf4ce7fd.jpg",
-    address: "411 Campbell Street, Tofino",
-    location: {
-      lat: 49.1523597,
-      lng: -125.9068902,
-    },
-    creator: "u2",
-  },
-  {
-    id: "p3",
-    title: "Tofino",
-    description: "A popular year-round tourism destination.",
-    imageUrl:
-      "https://www.travelandleisure.com/thmb/30qfukQH1j5olGSTkZQqsM4phoI=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/TAL-tofino-BEAUTYCANADA0623-6d4980ad850c4b668185364daf4ce7fd.jpg",
-    address: "411 Campbell Street, Tofino",
-    location: {
-      lat: 49.1523597,
-      lng: -125.9068902,
-    },
-    creator: "u2",
-  },
-];
+const Place = require("../models/place");
+const User = require("../models/user");
+const mongoose = require("mongoose");
 
-const getPlaceById = (req, res, next) => {
+// note: must use async and await
+const getPlaceById = async (req, res, next) => {
   const placeId = req.params.pid;
-  const place = DUMMY_PLACES.find((p) => p.id === placeId);
+  let place;
+
+  // Note: the folowing 2 error handlers are dif, the first one is to catch the case that
+  // out get request generally has some problems (i.e. missing information), while
+  // the second one is to handle the case such as we don't have our places id in our
+  // in the database.
+
+  try {
+    // compared to the save method, findById method does not return a real promise (although
+    // we can still use then cach blocks or async await), we can use exec() to get a real promise.
+    place = await Place.findById(placeId);
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, could not find a place.",
+      500
+    );
+    return next(error);
+  }
 
   if (!place) {
     // we can choose either to use throw to throw the error here, or to use next to forward the error to
     // app.js, but the better option is to use next. The reason is that we might be using a asynchronous middleware.
     //-------
     // throw can cancel the function execution, no need for return
-    throw new HttpError("Could not find a place for the provided id.", 404);
+    const error = new HttpError(
+      "Could not find a place for the provided id.",
+      404
+    );
+
+    return next(error);
   }
 
-  res.json({ place });
+  res.json({ place: place.toObject({ getters: true }) });
 };
 
-const getPlacesByUserId = (req, res, next) => {
+const getPlacesByUserId = async (req, res, next) => {
   const userId = req.params.uid;
-  //find only return the first element when the condition is true, while filter can return
+  //Array.find only return the first element when the condition is true, while filter can return
   // an array of elments that meet the condition
-  const places = DUMMY_PLACES.filter((p) => p.creator === userId);
+  let places;
+
+  try {
+    // this mongoose find method will return all the results that meet the requirements
+    places = await Place.find({ creator: userId });
+  } catch (err) {
+    const error = new HttpError(
+      "Fetching places failed, please try again.",
+      500
+    );
+    return next(error);
+  }
 
   // `!places` does not contain the case that place is an empty array
   if (!places || places.length === 0) {
@@ -76,7 +71,11 @@ const getPlacesByUserId = (req, res, next) => {
       new HttpError("Could not find a place for the provided user id.", 404)
     );
   }
-  res.json({ places });
+
+  // The toObject method is applicable to individual Mongoose documents, not to an array
+  // of documents directly. If you want to convert an array of documents to an array
+  // of plain JavaScript objects, you should use map or another iteration method.
+  res.json({ places: places.map((p) => p.toObject({ getters: true })) });
 };
 
 // GET request does not have a request body, while POST request does
@@ -100,37 +99,99 @@ const createPlace = async (req, res, next) => {
     return next(error);
   }
 
-  const createdPlace = {
-    id: uuid.v4(),
+  const createdPlace = new Place({
     title, //short for title: title
     description,
-    location: coordinates,
     address,
+    location: coordinates,
+    image:
+      "https://www.travelandleisure.com/thmb/30qfukQH1j5olGSTkZQqsM4phoI=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/TAL-tofino-BEAUTYCANADA0623-6d4980ad850c4b668185364daf4ce7fd.jpg",
     creator,
-  };
-  DUMMY_PLACES.push(createdPlace); // unshift(createdPlace) if want to add to the beginning
+  });
+
+  let user;
+  try {
+    user = await User.findById(creator);
+  } catch (err) {
+    const error = new HttpError(
+      "Failed to create places, please try again.",
+      500
+    );
+    return next(error);
+  }
+
+  if (!user) {
+    const error = new HttpError("Could not find user for provided id.", 404);
+    return next(error);
+  }
+  console.log(user);
+
+  try {
+    // session and transaction
+    const sess = await mongoose.startSession();
+    sess.startTransaction();
+    // auto-generate the unique id for added places and store them in mongodb
+    await createdPlace.save({ session: sess });
+
+    // This push method is not JavaScript array push, instead, it is a Mongoose method
+    // to establish the connection between the two models we are referring to behind the scene.
+    user.places.push(createdPlace);
+    await user.save({ session: sess });
+    // Note: only at this point, the changes are really saved in the db. If anything
+    // gone wrong in the tasks that are part of the session and transaction, all changes
+    // would have been rolled back automatically by MongoDB.
+    await sess.commitTransaction();
+  } catch (err) {
+    const error = new HttpError(
+      "Creating place failed, please try again.",
+      500
+    );
+    return next(error);
+  }
 
   res.status(201).json({ place: createdPlace });
 };
 
-const updatePlaceById = (req, res, next) => {
+const updatePlace = async (req, res, next) => {
   const placeId = req.params.pid;
   const { title, description } = req.body;
+  let place;
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     console.log(errors);
-    throw new HttpError("Invalid inputs passed, please check your data.", 422);
+    return next(
+      new HttpError("Invalid inputs passed, please check your data.", 422)
+    );
   }
 
-  //update the properties in an immutable manner. Store the updated data in a variable, and only
-  // when this process is done successfully, will we update the array with this variable.
-  const updatedPlace = { ...DUMMY_PLACES.find((p) => p.id === placeId) };
-  const placeIndex = DUMMY_PLACES.findIndex((p) => p.id === placeId);
-  updatedPlace.title = title;
-  updatedPlace.description = description;
+  try {
+    place = await Place.findById(placeId);
+  } catch (err) {
+    const error = new HttpError(
+      "Failed to update places, please try again.",
+      500
+    );
+    return next(error);
+  }
 
-  DUMMY_PLACES[placeIndex] = updatedPlace;
+  // //update the properties in an immutable manner. Store the updated data in a variable, and only
+  // // when this process is done successfully, will we update the array with this variable.
+  // const updatedPlace = { ...DUMMY_PLACES.find((p) => p.id === placeId) };
+  // const placeIndex = DUMMY_PLACES.findIndex((p) => p.id === placeId);
+
+  place.title = title;
+  place.description = description;
+
+  try {
+    await place.save();
+  } catch (err) {
+    const error = new HttpError(
+      "Failed to update places, please try again.",
+      500
+    );
+    return next(error);
+  }
 
   // const updatedPlaces = DUMMY_PLACES.map((p) => {
   //   if (p.id === placeId) {
@@ -143,24 +204,48 @@ const updatePlaceById = (req, res, next) => {
   //   return p;
   // });
 
-  res.status(200).json({ places: updatedPlace });
+  res.status(200).json({ places: place.toObject({ getters: true }) });
 };
 
-const deletePlaceById = (req, res, next) => {
+const deletePlace = async (req, res, next) => {
   const placeId = req.params.pid;
+  let place;
 
-  if (!DUMMY_PLACES.find((p) => p.id === placeId)) {
-    throw new HttpError("COuld not find a place for that id.", 404);
+  try {
+    place = await Place.findById(placeId);
+    // console.log(place);
+  } catch (err) {
+    // console.log(err);
+    const error = new HttpError(
+      "Failed to delete places, please try again.",
+      500
+    );
+    return next(error);
   }
 
-  //filter() return a brand new array, adhering to the immutablility principle
-  DUMMY_PLACES = DUMMY_PLACES.filter((p) => p.id !== placeId);
+  try {
+    // document.remove() is descrepted, now using deleteOne()
+    await place.deleteOne();
+  } catch (err) {
+    // console.log(err);
+    const error = new HttpError(
+      "Failed to delete places, please try again.",
+      500
+    );
+    return next(error);
+  }
 
-  res.status(200).json({ mesage: "Deleted place.", place: DUMMY_PLACES });
+  // if (!DUMMY_PLACES.find((p) => p.id === placeId)) {
+  //   throw new HttpError("COuld not find a place for that id.", 404);
+  // }
+  // //filter() return a brand new array, adhering to the immutablility principle
+  // DUMMY_PLACES = DUMMY_PLACES.filter((p) => p.id !== placeId);
+
+  res.status(200).json({ message: "Deleted place." });
 };
 
 exports.getPlaceById = getPlaceById; // note: use getPlaceById instead of getPlaceById() since we don't call it here.
 exports.getPlacesByUserId = getPlacesByUserId;
 exports.createPlace = createPlace;
-exports.updatePlaceById = updatePlaceById;
-exports.deletePlaceById = deletePlaceById;
+exports.updatePlace = updatePlace;
+exports.deletePlace = deletePlace;

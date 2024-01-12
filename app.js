@@ -1,5 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
 
 // a middleware to be used
 const placesRoutes = require("./routes/places-routes");
@@ -34,4 +35,18 @@ app.use((error, req, res, next) => {
     .json({ message: error.message || "An unknown error occurred!" });
 });
 
-app.listen(5000);
+mongoose
+  .connect(
+    "mongodb+srv://blzhang41:yJeVJzUmBE2T8Sie@cluster0.oxhonrv.mongodb.net/places?retryWrites=true&w=majority"
+  )
+  .then(() => {
+    //if database connection is successful, start the backend server.
+    app.listen(5000);
+    console.log("We are connected to database!");
+  })
+  .catch((err) => {
+    console.log(err);
+  });
+
+// a database can contain one or multiple collections and a collection can contain
+// one or multiple documents.

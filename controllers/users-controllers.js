@@ -4,7 +4,7 @@ const uuid = require("uuid");
 
 const { validationResult } = require("express-validator");
 
-// let isLoggedIn = false;
+const User = require("../models/user");
 
 let DUMMY_USERS = [
   {
@@ -21,46 +21,93 @@ let DUMMY_USERS = [
   },
 ];
 
-const getUsers = (req, res, next) => {
-  //   if (!allUsers || allUsers.length === 0) {
-  //     throw new HttpError("Could not find any users", 404);
-  //   }
-  res.json({ users: DUMMY_USERS });
+const getUsers = async (req, res, next) => {
+  let users;
+
+  try {
+    //`const users = User.find({},'email name' );` also works
+    users = await User.find({}, "-password");
+  } catch (err) {
+    const error = new HttpError(
+      "Fetching users failed, please try again.",
+      500
+    );
+    return next(error);
+  }
+
+  res.json({ users: users.map((u) => u.toObject({ getters: true })) });
 };
 
-const signup = (req, res, next) => {
+const signup = async (req, res, next) => {
   const { name, email, password } = req.body;
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
-    throw new HttpError("Invalid inputs passed, please check your data.", 422);
+    return next(
+      // should not use `throw` error in asynchronous functions, instead, use `return next(error)`.
+      new HttpError("Invalid inputs passed, please check your data.", 422)
+    );
   }
 
-  const hasUser = DUMMY_USERS.find((u) => u.email === email);
-  if (hasUser) {
-    throw new HttpError("Could not create user, email already exists.", 422);
+  let existingUser;
+  try {
+    existingUser = await User.findOne({ email: email });
+  } catch (err) {
+    const error = new HttpError(
+      "Signing up failed, please try again later.",
+      500
+    );
+    return next(error);
   }
-  const createdUser = {
-    id: uuid.v4(),
+
+  if (existingUser) {
+    const error = new HttpError(
+      "User exists already, please login instead.",
+      422
+    );
+    return next(error);
+  }
+
+  const createdUser = new User({
     name,
     email,
+    image:
+      "https://www.travelandleisure.com/thmb/30qfukQH1j5olGSTkZQqsM4phoI=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/TAL-tofino-BEAUTYCANADA0623-6d4980ad850c4b668185364daf4ce7fd.jpg",
     password,
-  };
+    places: [],
+  });
 
-  DUMMY_USERS.push(createdUser);
+  try {
+    await createdUser.save();
+  } catch (err) {
+    const error = new HttpError("Failed to sign up, please try again.", 500);
+    console.log(err);
+    return next(error);
+  }
 
-  res.status(201).json({ user: createdUser });
+  res.status(201).json({ user: createdUser.toObject({ getters: true }) });
 };
 
-const login = (req, res, next) => {
+const login = async (req, res, next) => {
   const { email, password } = req.body;
-  const identifiedUser = DUMMY_USERS.find((u) => u.email === email);
+  let identifiedUser;
+  try {
+    identifiedUser = await User.findOne({ email: email });
+  } catch (err) {
+    const error = new HttpError(
+      "Failed to log in, please try again later.",
+      500
+    );
+    return next(error);
+  }
+
   if (!identifiedUser || identifiedUser.password !== password) {
-    throw new HttpError(
+    const error = new HttpError(
       "Could not identify user, credentials seem to be wrong",
       401
     );
+
+    return next(error);
   }
 
   res.json({ message: "Logged in!" });
