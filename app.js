@@ -16,6 +16,20 @@ const HttpError = require("./models/http-errors");
 // it calls next automatically so it reached to the next middleware.
 app.use(bodyParser.json());
 
+// Add a middleware before we forward the request to specific routes
+app.use((req, res, next) => {
+  // Add headers to the response so that when later a response is sent back from our more
+  // specific routes, it deos have these headers attached.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE");
+
+  next();
+});
+
 // the path just needs to start with `/api/places`, not exactly like it
 app.use("/api/places", placesRoutes);
 
@@ -37,7 +51,7 @@ app.use((error, req, res, next) => {
 
 mongoose
   .connect(
-    "mongodb+srv://blzhang41:yJeVJzUmBE2T8Sie@cluster0.oxhonrv.mongodb.net/places?retryWrites=true&w=majority"
+    "mongodb+srv://blzhang41:yJeVJzUmBE2T8Sie@cluster0.oxhonrv.mongodb.net/mern?retryWrites=true&w=majority"
   )
   .then(() => {
     //if database connection is successful, start the backend server.
