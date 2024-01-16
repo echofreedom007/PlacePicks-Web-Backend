@@ -64,7 +64,7 @@ const getPlacesByUserId = async (req, res, next) => {
   }
 
   // `!places` does not contain the case that place is an empty array
-  if (!places || places.length === 0) {
+  if (!places) {
     // next does not cancel the function execution as throw does, so need to return it
     return next(
       new HttpError("Could not find a place for the provided user id.", 404)

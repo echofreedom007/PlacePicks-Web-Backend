@@ -1,3 +1,6 @@
+const fs = require("fs"); // file system module
+const path = require("path");
+
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
@@ -15,6 +18,8 @@ const HttpError = require("./models/http-errors");
 // need the body.
 // it calls next automatically so it reached to the next middleware.
 app.use(bodyParser.json());
+
+app.use("/uploads/images", express.static(path.join("uploads", "images")));
 
 // Add a middleware before we forward the request to specific routes
 app.use((req, res, next) => {
@@ -41,6 +46,11 @@ app.use((req, res, next) => {
 });
 
 app.use((error, req, res, next) => {
+  if (req.file) {
+    fs.unlink(req.file.path, (err) => {
+      console.log(err);
+    });
+  }
   if (res.headerSent) {
     return next(error);
   }
