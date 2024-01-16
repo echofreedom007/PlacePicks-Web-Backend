@@ -1,6 +1,7 @@
 const HttpError = require("../models/http-errors");
 const { validationResult } = require("express-validator");
 const User = require("../models/user");
+const bcrypt = require("bcryptjs");
 
 const getUsers = async (req, res, next) => {
   let users;
@@ -49,11 +50,26 @@ const signup = async (req, res, next) => {
     return next(error);
   }
 
+  let hashedPassword;
+
+  try {
+    // hash returns a promise, 12 here is the Salt length, and 12 is a good
+    // length for reverse engeineering
+    hashedPassword = await bcrypt.hash(password, 12);
+  } catch (err) {
+    const error = new HttpError(
+      "Could not create user, please try again.",
+      500
+    );
+
+    return next(error);
+  }
+
   const createdUser = new User({
     name,
     email,
     image: req.file.path,
-    password,
+    password: hashedPassword,
     places: [],
   });
 

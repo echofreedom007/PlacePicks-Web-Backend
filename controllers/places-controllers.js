@@ -103,7 +103,7 @@ const createPlace = async (req, res, next) => {
     description,
     address,
     location: coordinates,
-    image: req.file.path,
+    image: req.file.path, //only store paths in the database, instead, store the files locally
     creator,
   });
 
