@@ -173,6 +173,13 @@ const updatePlace = async (req, res, next) => {
     return next(error);
   }
 
+  // auth check
+  // creator is an object of type mongoose object id, needs to be converted to string
+  if (place.creator.toString() !== req.userData.userId) {
+    const error = new HttpError("You are not allowed to edit this place.", 403);
+    return next(error);
+  }
+
   // //update the properties in an immutable manner. Store the updated data in a variable, and only
   // // when this process is done successfully, will we update the array with this variable.
   // const updatedPlace = { ...DUMMY_PLACES.find((p) => p.id === placeId) };
@@ -224,6 +231,14 @@ const deletePlace = async (req, res, next) => {
 
   if (!place) {
     const error = new HttpError("Could not find place for this id.", 404);
+    return next(error);
+  }
+
+  if (place.creator.id !== req.userData.userId) {
+    const error = new HttpError(
+      "You are not allowed to delete this place.",
+      403
+    );
     return next(error);
   }
 
