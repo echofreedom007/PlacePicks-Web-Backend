@@ -147,7 +147,7 @@ const login = async (req, res, next) => {
   try {
     token = jwt.sign(
       // the data we want to send back to frontend
-      { userId: identifiedUser.userId, email: identifiedUser.email },
+      { userId: identifiedUser.id, email: identifiedUser.email },
       // note: make sure we use the same private key here as in signup, if not, when the
       // user later sends a token with a request, we wouldn't be able to validate them
       // correctly on the server.
@@ -158,7 +158,7 @@ const login = async (req, res, next) => {
 
   res.json({
     message: "Logged in!",
-    userId: identifiedUser.userId,
+    userId: identifiedUser.id,
     email: identifiedUser.email,
     token: token,
   });
