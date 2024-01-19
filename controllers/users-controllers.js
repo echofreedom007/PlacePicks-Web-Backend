@@ -2,6 +2,7 @@ const HttpError = require("../models/http-errors");
 const { validationResult } = require("express-validator");
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const getUsers = async (req, res, next) => {
   let users;
@@ -77,11 +78,28 @@ const signup = async (req, res, next) => {
     await createdUser.save();
   } catch (err) {
     const error = new HttpError("Failed to sign up, please try again.", 500);
-    console.log(err);
     return next(error);
   }
 
-  res.status(201).json({ user: createdUser.toObject({ getters: true }) });
+  let token;
+  try {
+    // sign method will return a string which is the token
+    token = jwt.sign(
+      // the payload,the data to be encoded into the token, it can be a string, an object or a buffer
+      { userId: createdUser.id, email: createdUser.email },
+      // private key, confidential server-side key
+      "supersecret_dont_share",
+      // optional argument
+      { expiresIn: "1h" }
+    );
+  } catch (err) {
+    const error = new HttpError("Failed to sign up, please try again.", 500);
+    return next(error);
+  }
+
+  res
+    .status(201)
+    .json({ userId: createdUser.id, email: createdUser.email, token: token });
 };
 
 const login = async (req, res, next) => {
@@ -125,9 +143,24 @@ const login = async (req, res, next) => {
     return next(error);
   }
 
+  let token;
+  try {
+    token = jwt.sign(
+      // the data we want to send back to frontend
+      { userId: identifiedUser.userId, email: identifiedUser.email },
+      // note: make sure we use the same private key here as in signup, if not, when the
+      // user later sends a token with a request, we wouldn't be able to validate them
+      // correctly on the server.
+      "supersecret_dont_share",
+      { expiresIn: "1h" }
+    );
+  } catch (err) {}
+
   res.json({
     message: "Logged in!",
-    user: identifiedUser.toObject({ getters: true }),
+    userId: identifiedUser.userId,
+    email: identifiedUser.email,
+    token: token,
   });
 };
 
