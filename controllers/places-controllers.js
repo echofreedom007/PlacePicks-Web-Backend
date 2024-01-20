@@ -90,7 +90,7 @@ const createPlace = async (req, res, next) => {
   }
 
   // get the properties out of the request body
-  const { title, description, address, creator } = req.body;
+  const { title, description, address } = req.body;
   let coordinates;
   try {
     coordinates = await getCoordsForAddress(address);
@@ -104,12 +104,12 @@ const createPlace = async (req, res, next) => {
     address,
     location: coordinates,
     image: req.file.path, //only store paths in the database, instead, store the files locally
-    creator,
+    creator: req.userData.userId,
   });
 
   let user;
   try {
-    user = await User.findById(creator);
+    user = await User.findById(req.userData.userId);
   } catch (err) {
     const error = new HttpError(
       "Failed to create places, please try again.",
@@ -122,7 +122,6 @@ const createPlace = async (req, res, next) => {
     const error = new HttpError("Could not find user for provided id.", 404);
     return next(error);
   }
-  console.log(user);
 
   try {
     // session and transaction
