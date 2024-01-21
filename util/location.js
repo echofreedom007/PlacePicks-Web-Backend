@@ -1,7 +1,6 @@
 const axios = require("axios");
-const { response } = require("express");
 
-const API_KEY = "AIzaSyBQ4Cw9oA_v7M-EDu7zuWnP8k9L8gskCpM";
+const API_KEY = process.env.GOOGLE_API_KEY;
 
 const HttpError = require("../models/http-errors");
 

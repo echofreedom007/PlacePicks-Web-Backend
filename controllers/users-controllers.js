@@ -88,7 +88,7 @@ const signup = async (req, res, next) => {
       // the payload,the data to be encoded into the token, it can be a string, an object or a buffer
       { userId: createdUser.id, email: createdUser.email },
       // private key, confidential server-side key
-      "supersecret_dont_share",
+      process.env.JWT_KEY,
       // optional argument
       { expiresIn: "1h" }
     );
